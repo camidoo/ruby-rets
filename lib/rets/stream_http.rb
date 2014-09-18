@@ -131,6 +131,8 @@ module RETS
         if ENCODABLE and @encoding
           data = data.force_encoding(@encoding) if @encoding
           data = data.encode("UTF-8")
+        elsif RUBY_VERSION < "1.9" && @encoding && @encoding != "UTF-8"
+          data = ::Iconv.conv('UTF-8//IGNORE', 'UTF-8', data + ' ')[0..-2]
         end
 
         @digest.update(data)

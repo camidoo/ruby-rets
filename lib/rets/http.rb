@@ -192,6 +192,7 @@ module RETS
       end
 
       headers = headers ? @headers.merge(headers) : @headers
+      headers = headers.merge({'accept-encoding' => 'none'})
 
       http = ::Net::HTTP.new(args[:url].host, args[:url].port)
       http.read_timeout = args[:read_timeout] if args[:read_timeout]

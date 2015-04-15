@@ -24,7 +24,7 @@ class RETS::Base::SAXMetadata < Nokogiri::XML::SAX::Document
         @rets_data[name.underscore.to_sym] = value
         system_data[name] = value
       end
-      @block.call("SYSTEM ", {"Resource" => "System"}, system_data)
+      @block.call("SYSTEM", {"Resource" => "System"}, system_data)
 
     # Parsing data
     elsif tag == "COLUMNS" or tag == "DATA"

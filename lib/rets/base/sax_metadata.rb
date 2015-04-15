@@ -19,7 +19,12 @@ class RETS::Base::SAXMetadata < Nokogiri::XML::SAX::Document
       end
 
     elsif tag == "SYSTEM"
-      @rets_data[:system_id] = attrs.first.last
+      system_data = {}
+      attrs.each do |name, value|
+        @rets_data[name.underscore.to_sym] = value
+        system_data[name] = value
+      end
+      @block.call("SYSTEM ", {"Resource" => "System"}, system_data)
 
     # Parsing data
     elsif tag == "COLUMNS" or tag == "DATA"
@@ -28,6 +33,11 @@ class RETS::Base::SAXMetadata < Nokogiri::XML::SAX::Document
 
     # Start of the parent we're working with
     elsif tag =~ /^METADATA-(.+)/
+      if $1 == "SYSTEM"
+        attrs.each do |name, value|
+          @rets_data[name.underscore.to_sym] = value
+        end
+      end
       @parent[:tag] = tag
       @parent[:name] = $1
       @parent[:data] = []

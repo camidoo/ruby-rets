@@ -169,7 +169,8 @@ module RETS
     # @raise [RETS::HTTPError]
     # @raise [RETS::Unauthorized]
     def request(args, &block)
-      if args[:params]
+      request_http_method = args.delete(:search_method) || "GET"
+      if args[:params] && request_http_method == "GET"
         url_terminator = (args[:url].request_uri.include?("?")) ? "&" : "?"
         request_uri = "#{args[:url].request_uri}#{url_terminator}"
         args[:params].each do |k, v|
@@ -185,9 +186,9 @@ module RETS
       @request_count += 1
       if @auth_mode == :digest
         if headers
-          headers["Authorization"] = create_digest("GET", request_uri)
+          headers["Authorization"] = create_digest(request_http_method, request_uri)
         else
-          headers = {"Authorization" => create_digest("GET", request_uri)}
+          headers = {"Authorization" => create_digest(request_http_method, request_uri)}
         end
       end
 
@@ -203,9 +204,16 @@ module RETS
         http.ca_file = @config[:http][:ca_file] if @config[:http][:ca_file]
         http.ca_path = @config[:http][:ca_path] if @config[:http][:ca_path]
       end
-
+      
+      if request_http_method == "POST"
+        request_method = :request_post
+        request_params = [request_uri, args[:params].to_query, headers]
+      else
+        request_method = :request_get
+        request_params = [request_uri, headers]
+      end
       http.start do
-        http.request_get(request_uri, headers) do |response|
+        http.send(request_method, *request_params) do |response|
           # Pass along the cookies
           # Some servers will continually call Set-Cookie with the same value for every single request
           # to avoid authentication problems from cookies being stomped over (which is sad, nobody likes having their cookies crushed).

@@ -164,6 +164,7 @@ module RETS
     # @option args [URI] :url URI to request data from
     # @option args [Hash, Optional] :params Query string to include with the request
     # @option args [Integer, Optional] :read_timeout How long to wait for the socket to return data before timing out
+    # @option args [Integer, Optional] :open_timeout How long to wait for the connection to open before timing out
     #
     # @raise [RETS::APIError]
     # @raise [RETS::HTTPError]
@@ -196,6 +197,7 @@ module RETS
 
       http = ::Net::HTTP.new(args[:url].host, args[:url].port)
       http.read_timeout = args[:read_timeout] if args[:read_timeout]
+      http.open_timeout = args[:open_timeout] if args[:open_timeout]
       http.set_debug_output(@config[:debug_output]) if @config[:debug_output]
 
       if args[:url].scheme == "https"

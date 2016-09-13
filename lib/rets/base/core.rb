@@ -80,13 +80,23 @@ module RETS
         end
 
         @request_size, @request_hash, @request_time, @rets_data = nil, nil, nil, nil
+        start = Time.now.utc.to_f
         @http.request(:url => @urls[:getmetadata], :read_timeout => args[:read_timeout], :params => {:Format => :COMPACT, :Type => args[:type], :ID => args[:id]}) do |response|
-          stream = RETS::StreamHTTP.new(response)
+          if args[:disable_stream]
+            stream = StringIO.new(response.body)
+            @request_time = Time.now.utc.to_f - start
+          else
+            stream = RETS::StreamHTTP.new(response)
+          end
           sax = RETS::Base::SAXMetadata.new(block)
 
           Nokogiri::XML::SAX::Parser.new(sax).parse_io(stream)
 
-          @request_size, @request_hash = stream.size, stream.hash
+          if args[:disable_stream]
+            @request_size, @request_hash = response.body.length, Digest::SHA1.hexdigest(response.body)
+          else
+            @request_size, @request_hash = stream.size, stream.hash
+          end
           @rets_data = sax.rets_data
         end
 

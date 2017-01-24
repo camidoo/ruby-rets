@@ -235,6 +235,7 @@ module RETS
       # @option args [Integer, Optional] :read_timeout How long to wait for data from the socket before giving up
       # @option args [Integer, Optional] :open_timeout How long to wait for connection to open before giving up
       # @option args [Boolean, Optional] :disable_stream Disables the streaming setup for data and instead loads it all and then parses
+      # @option args [Boolean, Optional] :http_method Specifies what http method to use for the request - GET/POST - GET by default
       #
       # @yield Called for every <DATA></DATA> group from the RETS server
       # @yieldparam [Hash] :data One record of data from the RETS server
@@ -254,7 +255,8 @@ module RETS
           raise RETS::CapabilityNotFound.new("Cannot find URL for Search call")
         end
 
-        req = {:url => @urls[:search], :read_timeout => args[:read_timeout], :open_timeout => args[:open_timeout]}
+        http_method = args[:http_method] || 'GET'
+        req = {:url => @urls[:search], :read_timeout => args[:read_timeout], :open_timeout => args[:open_timeout], method: args[:http_method]}
         req[:params] = {:Format => "COMPACT-DECODED", :SearchType => args[:search_type], :QueryType => "DMQL2", :Query => args[:query], :Class => args[:class], :Limit => args[:limit], :Offset => args[:offset], :RestrictedIndicator => args[:restricted]}
         req[:params][:Select] = args[:select].join(",") if args[:select].is_a?(Array)
         req[:params][:StandardNames] = 1 if args[:standard_names]

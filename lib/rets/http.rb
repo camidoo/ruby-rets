@@ -204,7 +204,7 @@ module RETS
       request = nil
       if args[:http_method].to_s.downcase == 'post'
         request = Net::HTTP::Post.new request_uri, headers
-        body_data = args[:params] if args[:params]
+        body_data = args[:params]
       else
         if args[:params]
           url_terminator = (args[:url].request_uri.include?("?")) ? "&" : "?"

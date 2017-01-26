@@ -254,8 +254,7 @@ module RETS
         unless @urls[:search]
           raise RETS::CapabilityNotFound.new("Cannot find URL for Search call")
         end
-
-        http_method = args[:http_method] || 'GET'
+        
         req = {:url => @urls[:search], :read_timeout => args[:read_timeout], :open_timeout => args[:open_timeout], http_method: args[:http_method]}
         req[:params] = {:Format => "COMPACT-DECODED", :SearchType => args[:search_type], :QueryType => "DMQL2", :Query => args[:query], :Class => args[:class], :Limit => args[:limit], :Offset => args[:offset], :RestrictedIndicator => args[:restricted]}
         req[:params][:Select] = args[:select].join(",") if args[:select].is_a?(Array)

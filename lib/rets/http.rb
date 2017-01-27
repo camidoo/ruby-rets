@@ -170,15 +170,8 @@ module RETS
     # @raise [RETS::HTTPError]
     # @raise [RETS::Unauthorized]
     def request(args, &block)
-      if args[:params]
-        url_terminator = (args[:url].request_uri.include?("?")) ? "&" : "?"
-        request_uri = "#{args[:url].request_uri}#{url_terminator}"
-        args[:params].each do |k, v|
-          request_uri << "#{k}=#{url_encode(v.to_s)}&" if v
-        end
-      else
-        request_uri = args[:url].request_uri
-      end
+
+      request_uri = args[:url].request_uri
 
       headers = args[:headers]
 
@@ -207,8 +200,30 @@ module RETS
         http.ca_path = @config[:http][:ca_path] if @config[:http][:ca_path]
       end
 
+      body_data = nil
+      request = nil
+      if args[:http_method].to_s.downcase == 'post'
+        request = Net::HTTP::Post.new request_uri, headers
+        if args[:params]
+          encoded_params = []
+          args[:params].each do |k, v|
+            encoded_params << "#{k}=#{url_encode(v.to_s)}" if v
+          end
+          body_data = encoded_params.join('&')
+        end
+      else
+        if args[:params]
+          url_terminator = (args[:url].request_uri.include?("?")) ? "&" : "?"
+          request_uri = "#{args[:url].request_uri}#{url_terminator}"
+          args[:params].each do |k, v|
+            request_uri << "#{k}=#{url_encode(v.to_s)}&" if v
+          end
+        end
+        request = Net::HTTP::Get.new request_uri, headers
+      end
+
       http.start do
-        http.request_get(request_uri, headers) do |response|
+        http.request(request, body_data) do |response|
           # Pass along the cookies
           # Some servers will continually call Set-Cookie with the same value for every single request
           # to avoid authentication problems from cookies being stomped over (which is sad, nobody likes having their cookies crushed).

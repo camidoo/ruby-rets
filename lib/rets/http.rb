@@ -10,7 +10,7 @@ module RETS
     def initialize(args)
       @headers = {"User-Agent" => "Ruby RETS/v#{RETS::VERSION}"}
       @request_count = 0
-      @config = {:http => {}}.merge(args)
+      @config = {:http => {}, :proxy => {}}.merge(args)
       @rets_data, @cookie_list = {}, {}
 
       if @config[:useragent] and @config[:useragent][:name]
@@ -188,7 +188,7 @@ module RETS
       headers = headers ? @headers.merge(headers) : @headers
       headers = headers.merge({'accept-encoding' => 'none'})
 
-      http = ::Net::HTTP.new(args[:url].host, args[:url].port)
+      http = ::Net::HTTP.new(args[:url].host, args[:url].port, @config[:proxy][:addr], @config[:proxy][:port], @config[:proxy][:username], @config[:proxy][:password])
       http.read_timeout = args[:read_timeout] if args[:read_timeout]
       http.open_timeout = args[:open_timeout] if args[:open_timeout]
       http.set_debug_output(@config[:debug_output]) if @config[:debug_output]

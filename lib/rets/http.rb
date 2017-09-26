@@ -218,6 +218,7 @@ module RETS
           args[:params].each do |k, v|
             request_uri << "#{k}=#{url_encode(v.to_s)}&" if v
           end
+          request_uri.gsub!(/&$/, '') # Remove trailing ampersand, breaks some RETS servers
         end
         request = Net::HTTP::Get.new request_uri, headers
       end

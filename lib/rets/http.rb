@@ -176,6 +176,9 @@ module RETS
         args[:params].each do |k, v|
           request_uri << "#{k}=#{url_encode(v.to_s)}&" if v
         end
+        if request_uri.last == "&"
+          request_uri = request_uri[0...-1]
+        end
       else
         request_uri = args[:url].request_uri
       end

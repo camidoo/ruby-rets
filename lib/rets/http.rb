@@ -43,6 +43,8 @@ module RETS
           encoded_string << "%25"
         when ","
           encoded_string << "%2C"
+        when "|"
+          encoded_string << "%7C"
         else
           encoded_string << char
         end

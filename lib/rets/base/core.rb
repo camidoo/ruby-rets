@@ -279,7 +279,7 @@ module RETS
             else
               body = body.to_s.force_encoding("UTF-8").scrub
             end
-            stream = StringIO.new(response.body)
+            stream = StringIO.new(body)
             @request_time = Time.now.utc.to_f - start
           else
             stream = RETS::StreamHTTP.new(response)

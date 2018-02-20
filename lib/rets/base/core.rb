@@ -256,7 +256,7 @@ module RETS
         end
 
         req = {:url => @urls[:search], :read_timeout => args[:read_timeout], :open_timeout => args[:open_timeout], http_method: args[:http_method]}
-        query_type = ['DMQL', 'DMQL2'].include?(args[:query_type].try(:upcase)) ? args[:query_types] : 'DMQL2'
+        query_type = ['DMQL', 'DMQL2'].include?(args[:query_type].try(:upcase)) ? args[:query_type] : 'DMQL2'
         req[:params] = {:Format => "COMPACT-DECODED", :SearchType => args[:search_type], :QueryType => query_type, :Query => args[:query], :Class => args[:class], :Limit => args[:limit], :Offset => args[:offset], :RestrictedIndicator => args[:restricted]}
         req[:params][:Select] = args[:select].join(",") if args[:select].is_a?(Array)
         req[:params][:StandardNames] = 1 if args[:standard_names]

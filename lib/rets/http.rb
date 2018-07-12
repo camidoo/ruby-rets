@@ -13,11 +13,11 @@ module RETS
       @config = {:http => {}, :proxy => {}}.merge(args)
       @rets_data, @cookie_list = {}, {}
 
-      if @config[:useragent] and @config[:useragent][:name]
+      if @config[:useragent] and @config[:useragent][:name] and @config[:useragent][:name] != ''
         @headers["User-Agent"] = @config[:useragent][:name]
       end
 
-      if @config[:rets_version]
+      if @config[:rets_version] and @config[:rets_version] != ''
         @rets_data[:version] = @config[:rets_version]
         self.setup_ua_authorization(:version => @config[:rets_version])
       end

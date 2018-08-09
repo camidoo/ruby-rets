@@ -257,7 +257,8 @@ module RETS
 
         req = {:url => @urls[:search], :read_timeout => args[:read_timeout], :open_timeout => args[:open_timeout], http_method: args[:http_method]}
         query_type = ['DMQL', 'DMQL2'].include?(args[:query_type].try(:upcase)) ? args[:query_type] : 'DMQL2'
-        req[:params] = {:Format => "COMPACT-DECODED", :SearchType => args[:search_type], :QueryType => query_type, :Query => args[:query], :Class => args[:class], :Limit => args[:limit], :Offset => args[:offset], :RestrictedIndicator => args[:restricted]}
+        format = args[:data_format].to_s.downcase == 'standard_xml' ? 'STANDARD-XML' : 'COMPACT-DECODED'
+        req[:params] = {:Format => format, :SearchType => args[:search_type], :QueryType => query_type, :Query => args[:query], :Class => args[:class], :Limit => args[:limit], :Offset => args[:offset], :RestrictedIndicator => args[:restricted]}
         req[:params][:Select] = args[:select].join(",") if args[:select].is_a?(Array)
         req[:params][:StandardNames] = 1 if args[:standard_names]
 
@@ -286,8 +287,14 @@ module RETS
             stream = RETS::StreamHTTP.new(response)
           end
 
+          if format == 'STANDARD-XML'
+            block.call stream.read
+            return
+          end
+
           sax = RETS::Base::SAXSearch.new(@rets_data, block)
           Nokogiri::XML::SAX::Parser.new(sax).parse_io(stream)
+
 
           if args[:disable_stream]
             @request_size, @request_hash = response.body.length, Digest::SHA1.hexdigest(response.body)

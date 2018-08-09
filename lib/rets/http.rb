@@ -10,14 +10,14 @@ module RETS
     def initialize(args)
       @headers = {"User-Agent" => "Ruby RETS/v#{RETS::VERSION}"}
       @request_count = 0
-      @config = {:http => {}}.merge(args)
+      @config = {:http => {}, :proxy => {}}.merge(args)
       @rets_data, @cookie_list = {}, {}
 
-      if @config[:useragent] and @config[:useragent][:name]
+      if @config[:useragent] and @config[:useragent][:name] and @config[:useragent][:name] != ''
         @headers["User-Agent"] = @config[:useragent][:name]
       end
 
-      if @config[:rets_version]
+      if @config[:rets_version] and @config[:rets_version] != ''
         @rets_data[:version] = @config[:rets_version]
         self.setup_ua_authorization(:version => @config[:rets_version])
       end
@@ -43,6 +43,8 @@ module RETS
           encoded_string << "%25"
         when ","
           encoded_string << "%2C"
+        when "|"
+          encoded_string << "%7C"
         else
           encoded_string << char
         end
@@ -164,20 +166,14 @@ module RETS
     # @option args [URI] :url URI to request data from
     # @option args [Hash, Optional] :params Query string to include with the request
     # @option args [Integer, Optional] :read_timeout How long to wait for the socket to return data before timing out
+    # @option args [Integer, Optional] :open_timeout How long to wait for the connection to open before timing out
     #
     # @raise [RETS::APIError]
     # @raise [RETS::HTTPError]
     # @raise [RETS::Unauthorized]
     def request(args, &block)
-      if args[:params]
-        url_terminator = (args[:url].request_uri.include?("?")) ? "&" : "?"
-        request_uri = "#{args[:url].request_uri}#{url_terminator}"
-        args[:params].each do |k, v|
-          request_uri << "#{k}=#{url_encode(v.to_s)}&" if v
-        end
-      else
-        request_uri = args[:url].request_uri
-      end
+
+      request_uri = args[:url].request_uri
 
       headers = args[:headers]
 
@@ -192,9 +188,11 @@ module RETS
       end
 
       headers = headers ? @headers.merge(headers) : @headers
+      headers = headers.merge({'accept-encoding' => 'none'})
 
-      http = ::Net::HTTP.new(args[:url].host, args[:url].port)
+      http = ::Net::HTTP.new(args[:url].host, args[:url].port, @config[:proxy][:addr], @config[:proxy][:port], @config[:proxy][:username], @config[:proxy][:password])
       http.read_timeout = args[:read_timeout] if args[:read_timeout]
+      http.open_timeout = args[:open_timeout] if args[:open_timeout]
       http.set_debug_output(@config[:debug_output]) if @config[:debug_output]
 
       if args[:url].scheme == "https"
@@ -204,8 +202,31 @@ module RETS
         http.ca_path = @config[:http][:ca_path] if @config[:http][:ca_path]
       end
 
+      body_data = nil
+      request = nil
+      if args[:http_method].to_s.downcase == 'post'
+        request = Net::HTTP::Post.new request_uri, headers
+        if args[:params]
+          encoded_params = []
+          args[:params].each do |k, v|
+            encoded_params << "#{k}=#{url_encode(v.to_s)}" if v
+          end
+          body_data = encoded_params.join('&')
+        end
+      else
+        if args[:params]
+          url_terminator = (args[:url].request_uri.include?("?")) ? "&" : "?"
+          request_uri = "#{args[:url].request_uri}#{url_terminator}"
+          args[:params].each do |k, v|
+            request_uri << "#{k}=#{url_encode(v.to_s)}&" if v
+          end
+          request_uri.gsub!(/&$/, '') # Remove trailing ampersand, breaks some RETS servers
+        end
+        request = Net::HTTP::Get.new request_uri, headers
+      end
+
       http.start do
-        http.request_get(request_uri, headers) do |response|
+        http.request(request, body_data) do |response|
           # Pass along the cookies
           # Some servers will continually call Set-Cookie with the same value for every single request
           # to avoid authentication problems from cookies being stomped over (which is sad, nobody likes having their cookies crushed).
@@ -216,7 +237,7 @@ module RETS
             response.header.get_fields("set-cookie").each do |cookie|
               key, value = cookie.split(";").first.split("=")
               key.strip!
-              value.strip!
+              value.try(:strip!)
 
               # If it's a RETS-Session-ID, it needs to be shoved into the RETS-UA-Authorization field
               # Save the RETS-Session-ID so it can be used with RETS-UA-Authorization

@@ -60,6 +60,7 @@ module RETS
       # @option args [String] :type Metadata to request, the same value if you were manually making the request, "METADATA-SYSTEM", "METADATA-CLASS" and so on
       # @option args [String] :id Filter the data returned by ID, "*" would return all available data
       # @option args [Integer, Optional] :read_timeout How many seconds to wait before giving up
+      # @option args [Integer, Optional] :open_timeout How many seconds to wait for connection to open before giving up
       #
       # @yield For every group of metadata downloaded
       # @yieldparam [String] :type Type of data that was parsed with "METADATA-" stripped out, for "METADATA-SYSTEM" this will be "SYSTEM"
@@ -80,7 +81,7 @@ module RETS
         end
 
         @request_size, @request_hash, @request_time, @rets_data = nil, nil, nil, nil
-        @http.request(:url => @urls[:getmetadata], :read_timeout => args[:read_timeout], :params => {:Format => :COMPACT, :Type => args[:type], :ID => args[:id]}) do |response|
+        @http.request(:url => @urls[:getmetadata], :read_timeout => args[:read_timeout], :open_timeout => args[:open_timeout], :params => {:Format => :COMPACT, :Type => args[:type], :ID => args[:id]}) do |response|
           stream = RETS::StreamHTTP.new(response)
           sax = RETS::Base::SAXMetadata.new(block)
 
@@ -103,6 +104,7 @@ module RETS
       # @option args [Array, Optional] :accept Array of MIME types to accept, by default this is *image/png*, *image/gif* and *image/jpeg*
       # @option args [Boolean, Optional] :location Return the location of the object rather than the contents of it
       # @option args [Integer, Optional] :read_timeout How many seconds to wait before timing out
+      # @option args [Integer, Optional] :open_timeout How many seconds to wait before timing out
       #
       # @yield For every object downloaded
       # @yieldparam [Hash] :headers Object headers
@@ -126,7 +128,7 @@ module RETS
           raise RETS::CapabilityNotFound.new("No GetObject capability found for given user.")
         end
 
-        req = {:url => @urls[:getobject], :read_timeout => args[:read_timeout], :headers => {}}
+        req = {:url => @urls[:getobject], :read_timeout => args[:read_timeout], :open_timeout => args[:open_timeout], :headers => {}}
         req[:params] = {:Resource => args[:resource], :Type => args[:type], :Location => (args[:location] ? 1 : 0), :ID => args[:id]}
         if args[:accept].is_a?(Array)
           req[:headers]["Accept"] = args[:accept].join(",")
@@ -231,7 +233,10 @@ module RETS
       # @option args [Boolean, Optional] :standard_names Whether to use standard names for all fields
       # @option args [String, Optional] :restricted String to show in place of a field value for any restricted fields the user cannot see
       # @option args [Integer, Optional] :read_timeout How long to wait for data from the socket before giving up
+      # @option args [Integer, Optional] :open_timeout How long to wait for connection to open before giving up
       # @option args [Boolean, Optional] :disable_stream Disables the streaming setup for data and instead loads it all and then parses
+      # @option args [Symbol, Optional] :http_method Specifies what http method to use for the request - GET/POST - GET by default
+      # @option args [String, Optional] :data_format Specifies what data format to use: (compact_decoded|standard_xml). Defaults to compact_decoded. standard_xml will yield up to 8MB of raw XML payload
       #
       # @yield Called for every <DATA></DATA> group from the RETS server
       # @yieldparam [Hash] :data One record of data from the RETS server
@@ -251,8 +256,10 @@ module RETS
           raise RETS::CapabilityNotFound.new("Cannot find URL for Search call")
         end
 
-        req = {:url => @urls[:search], :read_timeout => args[:read_timeout]}
-        req[:params] = {:Format => "COMPACT-DECODED", :SearchType => args[:search_type], :QueryType => "DMQL2", :Query => args[:query], :Class => args[:class], :Limit => args[:limit], :Offset => args[:offset], :RestrictedIndicator => args[:restricted]}
+        req = {:url => @urls[:search], :read_timeout => args[:read_timeout], :open_timeout => args[:open_timeout], http_method: args[:http_method]}
+        query_type = ['DMQL', 'DMQL2'].include?(args[:query_type].try(:upcase)) ? args[:query_type] : 'DMQL2'
+        format = args[:data_format].to_s.downcase == 'standard_xml' ? 'STANDARD-XML' : 'COMPACT-DECODED'
+        req[:params] = {:Format => format, :SearchType => args[:search_type], :QueryType => query_type, :Query => args[:query], :Class => args[:class], :Limit => args[:limit], :Offset => args[:offset], :RestrictedIndicator => args[:restricted]}
         req[:params][:Select] = args[:select].join(",") if args[:select].is_a?(Array)
         req[:params][:StandardNames] = 1 if args[:standard_names]
 
@@ -267,14 +274,28 @@ module RETS
         start = Time.now.utc.to_f
         @http.request(req) do |response|
           if args[:disable_stream]
-            stream = StringIO.new(response.body)
+            body = response.body
+            if response.header.key?("content-type") and response["content-type"] =~ /.*charset=(.*)/i
+              encoding = $1.to_s.upcase
+              body = body.to_s.force_encoding(encoding).scrub
+              body = body.encode("UTF-8")
+            else
+              body = body.to_s.force_encoding("UTF-8").scrub
+            end
+            stream = StringIO.new(body)
             @request_time = Time.now.utc.to_f - start
           else
             stream = RETS::StreamHTTP.new(response)
           end
 
+          if format == 'STANDARD-XML'
+            block.call stream.read(1024 * 1024 * 8)
+            return
+          end
+
           sax = RETS::Base::SAXSearch.new(@rets_data, block)
           Nokogiri::XML::SAX::Parser.new(sax).parse_io(stream)
+
 
           if args[:disable_stream]
             @request_size, @request_hash = response.body.length, Digest::SHA1.hexdigest(response.body)

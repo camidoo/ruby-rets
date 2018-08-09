@@ -236,6 +236,7 @@ module RETS
       # @option args [Integer, Optional] :open_timeout How long to wait for connection to open before giving up
       # @option args [Boolean, Optional] :disable_stream Disables the streaming setup for data and instead loads it all and then parses
       # @option args [Symbol, Optional] :http_method Specifies what http method to use for the request - GET/POST - GET by default
+      # @option args [String, Optional] :data_format Specifies what data format to use: (compact_decoded|standard_xml). Defaults to compact_decoded. standard_xml will yield up to 8MB of raw XML payload
       #
       # @yield Called for every <DATA></DATA> group from the RETS server
       # @yieldparam [Hash] :data One record of data from the RETS server
@@ -288,7 +289,7 @@ module RETS
           end
 
           if format == 'STANDARD-XML'
-            block.call stream.read
+            block.call stream.read(1024 * 1024 * 8)
             return
           end
 

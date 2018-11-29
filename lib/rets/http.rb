@@ -228,7 +228,7 @@ module RETS
             response.header.get_fields("set-cookie").each do |cookie|
               key, value = cookie.split(";").first.split("=")
               key.strip!
-              value.strip!
+              value = value.to_s.strip
 
               # If it's a RETS-Session-ID, it needs to be shoved into the RETS-UA-Authorization field
               # Save the RETS-Session-ID so it can be used with RETS-UA-Authorization

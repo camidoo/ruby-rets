@@ -21,4 +21,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake"
 
   spec.add_runtime_dependency 'nokogiri', '>= 1.5.0'
+  spec.add_runtime_dependency 'multi_xml', '>= 0.5.2'
 end

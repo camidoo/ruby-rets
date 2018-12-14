@@ -54,7 +54,7 @@ module RETS
       end
 
       ##
-      # Requests metadata from the RETS server.
+      # Requests metadata from the RETS server in "COMPACT" format
       #
       # @param [Hash] args
       # @option args [String] :type Metadata to request, the same value if you were manually making the request, "METADATA-SYSTEM", "METADATA-CLASS" and so on
@@ -101,6 +101,50 @@ module RETS
         end
 
         nil
+      end
+
+      ##
+      # Requests metadata from the RETS server in "STANDARD-XML" format
+      #
+      # @param [Hash] args
+      # @option args [String] :type Metadata to request, the same value if you were manually making the request, "METADATA-SYSTEM", "METADATA-CLASS" and so on
+      # @option args [String] :id Filter the data returned by ID, "*" would return all available data
+      # @option args [Integer, Optional] :read_timeout How many seconds to wait before giving up
+      #
+      # @return [Hash] Ruby Hash of the METADATA XML
+      #
+      # @raise [RETS::CapabilityNotFound]
+      # @raise [RETS::APIError]
+      # @raise [RETS::HTTPError]
+      # @see #rets_data
+      # @see #request_size
+      # @see #request_hash
+      def get_standard_metadata(args)
+        unless @urls[:getmetadata]
+          raise RETS::CapabilityNotFound.new("No GetMetadata capability found for given user.")
+        end
+        @request_size, @request_hash, @request_time, @rets_data = nil, nil, nil, nil
+        start = Time.now.utc.to_f
+        xml_doc = nil
+        @http.request(:url => @urls[:getmetadata], :read_timeout => args[:read_timeout], :params => {:Format => "STANDARD-XML", :Type => args[:type], :ID => args[:id]}) do |response|
+          @request_time = Time.now.utc.to_f - start
+          xml_doc = MultiXml.parse(response.body)
+          if xml_doc.has_key?("RETS")
+            @rets_data[:code] = xml_doc["RETS"]["ReplyCode"]
+            @rets_data[:text] = xml_doc["RETS"]["ReplyText"]
+            if @rets_data[:code] != "0" and @rets_data[:code] != "20201"
+              raise RETS::APIError.new("#{@rets_data[:code]}: #{@rets_data[:text]}", @rets_data[:code], @rets_data[:text])
+            end
+            if xml_doc["RETS"].has_key?("METADATA")
+              if xml_doc["RETS"]["METADATA"].has_key?("METADATA_SYSTEM")
+                @rets_data[:version] = xml["RETS"]["METADATA"]["METADATA_SYSTEM"]["Version"]
+                @rets_data[:date] = xml["RETS"]["METADATA"]["METADATA_SYSTEM"]["Date"]
+              end
+            end
+          end
+          @request_size, @request_hash = response.body.length, Digest::SHA1.hexdigest(response.body)
+        end
+        xml_doc
       end
 
       ##
